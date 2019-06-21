@@ -170,6 +170,13 @@ type Delete struct {
 	Row []Tuple
 }
 
+type Truncate struct {
+	// Option bits for TRUNCATE: 1 for CASCADE, 2 for RESTART IDENTITY
+	Option uint8
+	// ID of the relation corresponding to the ID in the relation message.
+	Relations []uint32
+}
+
 type Origin struct {
 	LSN  uint64
 	Name string
@@ -200,6 +207,7 @@ func (Relation) msg() {}
 func (Update) msg()   {}
 func (Insert) msg()   {}
 func (Delete) msg()   {}
+func (Truncate) msg() {}
 func (Commit) msg()   {}
 func (Origin) msg()   {}
 func (Type) msg()     {}
@@ -266,6 +274,15 @@ func Parse(src []byte) (Message, error) {
 		dl.Old = d.rowinfo('O')
 		dl.Row = d.tupledata()
 		return dl, nil
+	case 'T':
+		size := int(d.uint32())
+		opts := d.uint8()
+		data := make([]uint32, size)
+		for i := 0; i < size; i++ {
+			data[i] = d.uint32()
+		}
+		truncate := Truncate{Option: opts, Relations: data}
+		return truncate, nil
 	default:
 		return nil, fmt.Errorf("Unknown message type for %s (%d)", []byte{msgType}, msgType)
 	}
